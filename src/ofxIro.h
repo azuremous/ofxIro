@@ -6,5 +6,7 @@
 
 #pragma once 
 #include "iroFunction.h"
+#include "iroAnalysis.h"
 
 typedef iroFunction ofxIroComparison;
+typedef iroAnalysis ofxIroAnalysis;
