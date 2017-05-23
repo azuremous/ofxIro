@@ -21,7 +21,7 @@ public:
     void gotMessage(ofMessage msg);
     
     ofVideoGrabber grabber;
-    ofxIroAnalysis analizer;
-    ofxIroComparison iroChecker;
+    ofxIroCompress analyzer;
+    ofxIro iroChecker;
     
 };

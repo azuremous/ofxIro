@@ -5,7 +5,7 @@ vector<vector<ofColor> >cieColor;
 
 string deltaEstring[] = { "delta", "filter", "result" };
 float white = 248.;
-float difference = 32.;
+float difference = 22.;
 bool getColor = false;
 //--------------------------------------------------------------
 void ofApp::setup(){
@@ -15,7 +15,7 @@ void ofApp::setup(){
     grabber.setup(512,424);
     
     cieColor.resize(3);//3
-    iroChecker.setup(49., 247);
+    iroChecker.setup(difference, white);
 }
 
 //--------------------------------------------------------------
@@ -23,25 +23,25 @@ void ofApp::update(){
     ofSetWindowTitle(ofToString(ofGetFrameRate()));
     grabber.update();
     if(grabber.isFrameNew()){
-        analizer.analize(grabber.getPixels());
-        analizer.update();
-        if (analizer.isFrameNew()) {
-            pixelColors = analizer.getColor();
-            if(getColor){
-                iroChecker.analize(pixelColors);
+        analyzer.update(grabber.getPixels());
+        if (analyzer.isFrameNew()) {
+            vector<ofColor>p = analyzer.getColor();
+            iroChecker.update(p, CIE94);
+            if (iroChecker.isFrameNew()) {
+                cieColor = iroChecker.getColors();
+            }
+            if (iroChecker.isFrameNew() && getColor) {
+                pixelColors = iroChecker.getColor(NOWHITE);
                 getColor = false;
             }
         }
-        iroChecker.update();
-        if (iroChecker.isFrameNew()) {
-            cieColor = iroChecker.getColors();
-        }
-        
     }
 }
 
 //--------------------------------------------------------------
 void ofApp::draw(){
+    
+    analyzer.draw(20, 20);
     if (cieColor[0].size() > 0) {
         ofPushMatrix();
         ofPushStyle();
@@ -60,8 +60,12 @@ void ofApp::draw(){
         ofPopMatrix();
     }
     
-    analizer.draw(200, 200);
-    grabber.draw(640,0);
+    if(pixelColors.size() > 0){
+        for(int i = 0; i < pixelColors.size(); i++){
+            ofSetColor(pixelColors[i]);
+            ofDrawRectangle(20 + 40*i, 500, 40, 40);
+        }
+    }
 }
 
 //--------------------------------------------------------------

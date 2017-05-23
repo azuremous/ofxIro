@@ -19,93 +19,19 @@ typedef enum {
     CIE2000
 }DELTA_TYPE;
 
+typedef enum {
+    RAW,
+    FILTER,
+    NOWHITE,
+}IRO_TYPE;
+
 class iroFunction : public ofThread{
     
 protected:
     double pivotRgb(double n){ return (n > 0.04045 ? pow((n + 0.055) / 1.055, 2.4) : n / 12.92) * 100.0; }
     double PivotXyz(double n) { return (n > 0.008856 ? pow(n, 0.333333) : (7.787 * n) + (16/116.0)); }
     
-    ofVec3f convertToXYZ(const ofColor & c) {
-        double r = pivotRgb(c.r/255.0);
-        double g = pivotRgb(c.g/255.0);
-        double b = pivotRgb(c.b/255.0);
-        
-        ofVec3f colXYZ;
-        double x,y,z;
-        x = r * 0.4124 + g * 0.3576 + b * 0.1805;
-        y = r * 0.2126 + g * 0.7152 + b * 0.0722;
-        z = r * 0.0193 + g * 0.1192 + b * 0.9505;
-        
-        colXYZ.set(x, y, z);
-        
-        return colXYZ;
-    }
-    
-    ofVec3f convertXYZtoLAB(const ofVec3f &col){
-        double _x = PivotXyz(col.x / 95.047);
-        double _y = PivotXyz(col.y / 100.000);
-        double _z = PivotXyz(col.z / 108.883);
-        
-        ofVec3f colLAB;
-        float l,a,b;
-        l = ( 116 * _y ) - 16;
-        a = 500 * ( _x - _y );
-        b = 200 * ( _y - _z );
-        colLAB.set(l, a, b);
-        
-        return colLAB;
-    }
-    
-    ofVec3f convertLABtoLCH(const ofVec3f & c){
-        
-        double h = atan2(c.z , c.y);
-        if (h > 0) { h = (h / PI) * 180.; }
-        else{ 360 - (abs(h) / PI) * 180.0; }
-        
-        if (h < 0){ h += 360.0; }
-        else if (h >= 360) { h -= 360.0; }
-        
-        ofVec3f col;
-        double c_ = sqrt(c.y* c.y + c.z * c.z);
-        col.set(c.x, c_, h);
-        
-        return col;
-    }
-    
-public:
-    
-    explicit iroFunction():
-    difference(35.),
-    white(248.),
-    satBalance(0.4),
-    briBalance(0.4),
-    newFrame(true)
-    {
-        startThread();
-        deltaColor.resize(3);
-    }
-    
-    ~iroFunction(){
-        toAnalize.close();
-        analized.close();
-        waitForThread(true);
-    }
-    
-    void setup(float diff, float w){
-        setDiff(diff);
-        setWhite(w);
-    }
-    
-    void setDiff(float diff) { difference = diff; }
-    void setWhite(float w) { white = w; }
-    void setSatBalance(float s) { satBalance = s; }
-    void setBriBalance(float b) { briBalance = b; }
-    void setBalance(float s, float b) {
-        setSatBalance(s);
-        setBriBalance(b);
-    }
-    
-    bool compareColor(const ofColor &c1, const ofColor &c2, float distance){
+    bool compareColor76(const ofColor &c1, const ofColor &c2, float distance){
         
         ofVec3f col1, col2;
         
@@ -150,7 +76,7 @@ public:
         
     }
     
-    bool compareColor20(const ofColor &c1, const ofColor &c2, float distance){
+    bool compareColor2k(const ofColor &c1, const ofColor &c2, float distance){
         
         ofVec3f col1, col2;
         
@@ -203,8 +129,6 @@ public:
     
     vector<ofColor> makeGroup(DELTA_TYPE deltaType, const vector<ofColor>&c, float distance = 28.0){
         vector<ofColor>colorGroup;
-        ofColor mixedColor;
-        colorGroup.clear();
         for (int i = 0; i < c.size(); i++) {
             ofColor lastColor;
             lastColor = c[i];
@@ -215,7 +139,7 @@ public:
                 
                 for (int j = 0; j < colorGroup.size(); j++) {
                     if (deltaType == CIE76) { //CIE76
-                        if (!compareColor(colorGroup[j], lastColor, distance)) {//diff color
+                        if (!compareColor76(colorGroup[j], lastColor, distance)) {//diff color
                             num++;
                         }
                     }else if(deltaType == CIE94){ //CIE94
@@ -223,7 +147,7 @@ public:
                             num++;
                         }
                     }else if(deltaType == CIE2000){ //CIE2000
-                        if (!compareColor20(colorGroup[j], lastColor, distance)) {//diff color
+                        if (!compareColor2k(colorGroup[j], lastColor, distance)) {//diff color
                             num++;
                         }
                     }
@@ -236,39 +160,115 @@ public:
         return colorGroup;
     }
     
-    void analize(vector<ofColor> & col){
+public:
+    
+    explicit iroFunction():
+    difference(18.),
+    white(248.),
+    satBalance(0.4),
+    briBalance(0.4),
+    isUpdated(true)
+    {
+        startThread();
+        deltaColor.resize(3);
+    }
+    
+    ~iroFunction(){
+        toAnalize.close();
+        analized.close();
+        waitForThread(true);
+    }
+    
+    void setup(float diff, float w){
+        setDifference(diff);
+        setWhite(w);
+    }
+    
+    void setDifference(float diff) { difference = diff; }
+    void setWhite(float w) { white = w; }
+    void setSatBalance(float s) { satBalance = s; }
+    void setBriBalance(float b) { briBalance = b; }
+    void setBalance(float s, float b) {
+        setSatBalance(s);
+        setBriBalance(b);
+    }
+    
+    void update(vector<ofColor> & col, DELTA_TYPE type = CIE76){
+        deltaType = type;
         toAnalize.send(col);
+        if(!analized.tryReceive(isUpdated)) isUpdated = false;
     }
     
-    void update(){
-        newFrame = false;
-        while(analized.tryReceive(updated)){
-            newFrame = true;
-        }
-    }
+    bool isFrameNew(){ return isUpdated; }
     
-    bool isFrameNew(){ return newFrame; }
-    
-    vector<ofColor>getColor(int n) { return deltaColor[n]; }
+    vector<ofColor>getColor(IRO_TYPE type) { return deltaColor[type]; }
     vector<vector<ofColor> >getColors() { return deltaColor; }
+    
+    ofVec3f convertToXYZ(const ofColor & c) {
+        double r = pivotRgb(c.r/255.0);
+        double g = pivotRgb(c.g/255.0);
+        double b = pivotRgb(c.b/255.0);
+        
+        ofVec3f colXYZ;
+        double x,y,z;
+        x = r * 0.4124 + g * 0.3576 + b * 0.1805;
+        y = r * 0.2126 + g * 0.7152 + b * 0.0722;
+        z = r * 0.0193 + g * 0.1192 + b * 0.9505;
+        
+        colXYZ.set(x, y, z);
+        
+        return colXYZ;
+    }
+    
+    ofVec3f convertXYZtoLAB(const ofVec3f &col){
+        double _x = PivotXyz(col.x / 95.047);
+        double _y = PivotXyz(col.y / 100.000);
+        double _z = PivotXyz(col.z / 108.883);
+        
+        ofVec3f colLAB;
+        float l,a,b;
+        l = ( 116 * _y ) - 16;
+        a = 500 * ( _x - _y );
+        b = 200 * ( _y - _z );
+        colLAB.set(l, a, b);
+        
+        return colLAB;
+    }
+    
+    ofVec3f convertLABtoLCH(const ofVec3f & c){
+        
+        double h = atan2(c.z , c.y);
+        if (h > 0) { h = (h / PI) * 180.; }
+        else{ 360 - (abs(h) / PI) * 180.0; }
+        
+        if (h < 0){ h += 360.0; }
+        else if (h >= 360) { h -= 360.0; }
+        
+        ofVec3f col;
+        double c_ = sqrt(c.y* c.y + c.z * c.z);
+        col.set(c.x, c_, h);
+        
+        return col;
+    }
     
 private:
     float difference;
     float white;
     float satBalance;
     float briBalance;
-    bool newFrame;
-    bool updated;
+    DELTA_TYPE deltaType;
+    bool isUpdated;
     vector<vector<ofColor> >deltaColor;
     ofThreadChannel<vector<ofColor> > toAnalize;
     ofThreadChannel<bool> analized;
+    
     void threadedFunction(){
         while(isThreadRunning()){
             vector<ofColor>c;
             if (toAnalize.receive(c)) {
                 for (int i = 0; i < deltaColor.size(); i++) { deltaColor[i].clear(); }
                 //delta
-                deltaColor[0] = makeGroup(CIE76, c, difference);
+                deltaColor[0] = makeGroup(deltaType, c, difference);
                 //filter
                 deltaColor[1] = deltaColor[0];
                 for (int i = 0; i < deltaColor[1].size(); i++) {
@@ -281,14 +281,14 @@ private:
                     deltaColor[1][i].setBrightness(bri);
                 }
                 //result
-                deltaColor[2] = makeGroup(CIE76, deltaColor[1], 38.);
-                //delete white color
+                deltaColor[2] = makeGroup(deltaType, deltaColor[1], 38.);
+                //delete white
                 for (int i = 0; i < deltaColor[2].size(); i++) {
                     if (deltaColor[2][i].r >= white && deltaColor[2][i].g >= white && deltaColor[2][i].b >= white) {
                         deltaColor[2].erase(deltaColor[2].begin() + i);
                     }
                 }
-                analized.send(true);
+                if(deltaColor[0].size() > 0) { analized.send(true); }
             }else{
                 break;
             }

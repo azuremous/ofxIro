@@ -7,9 +7,8 @@
 
 //--------------------------------------------------------------
 iroAnalysis::iroAnalysis()
-:newFrame(true),
+:isAnalaized(true),
 scale(20),
-size(4),
 width(0)
 {
 	startThread();
@@ -24,27 +23,20 @@ iroAnalysis::~iroAnalysis(){
 }
 
 //--------------------------------------------------------------
-void iroAnalysis::analize(ofPixels & pixels){
+void iroAnalysis::update(ofPixels & pixels){
 	toAnalize.send(pixels);
+    if(!analized.tryReceive(isAnalaized)) isAnalaized = false;
 }
 
 //--------------------------------------------------------------
-void iroAnalysis::update(){
-	newFrame = false;
-	while(analized.tryReceive(isAnalaized)){
-		newFrame = true;
-	}
-}
-
-//--------------------------------------------------------------
-void iroAnalysis::draw(float x, float y){
-    if (analizedColor.size() > 0) {
+void iroAnalysis::draw(float x, float y){ //for debug
+    if (isFrameNew()) {
         ofPushMatrix();
         ofTranslate(x, y);
         ofPushStyle();
         for (int i = 0; i < analizedColor.size(); i++) {
             ofSetColor(analizedColor[i],255);
-            ofDrawRectangle((i% width)*size, (i / width)*size, size, size);
+            ofDrawRectangle((i% width)*scale, (i/width)*scale, scale, scale);
         }
         ofPopStyle();
         ofPopMatrix();
@@ -58,18 +50,20 @@ void iroAnalysis::threadedFunction(){
 		if(toAnalize.receive(pixels)){
             vector<ofColor>pixelColors;
             width = pixels.getWidth() / scale;
-            for (int y = 0; y < pixels.getHeight() - scale; y+=scale) {
-                for (int x = 0; x < pixels.getWidth() - scale; x+=scale) {
-                    float r,g,b,a;
-                    a = pixels.getColor(x, y).a;
-                    if (a > 0) {
-                        ofColor c = pixels.getColor(x, y);
+            int height = pixels.getHeight() / scale;
+            for (int y = 0; y < height; y++) {
+                for (int x = 0; x < width; x++) {
+                    float rx = x*scale + scale/2;
+                    float ry = y*scale + scale/2;
+                    float a = pixels.getColor(rx, ry).a;
+                    if (a > 0.) {
+                        ofColor c = pixels.getColor(rx, ry);
                         pixelColors.push_back(c);
                     }
                 }
             }
             analizedColor = pixelColors;
-            analized.send(true);
+            if(analizedColor.size() > 0) { analized.send(true); }
         }else{
 			break;
 		}

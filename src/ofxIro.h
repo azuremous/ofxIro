@@ -8,5 +8,5 @@
 #include "iroFunction.h"
 #include "iroAnalysis.h"
 
-typedef iroFunction ofxIroComparison;
-typedef iroAnalysis ofxIroAnalysis;
+typedef iroFunction ofxIro;
+typedef iroAnalysis ofxIroCompress;

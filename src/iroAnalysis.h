@@ -3,26 +3,24 @@
 
 class iroAnalysis: public ofThread {
 private:
-    void threadedFunction();
+    
     ofThreadChannel<ofPixels> toAnalize;
     ofThreadChannel<bool> analized;
     vector<ofColor>analizedColor;
     int scale;
     int width;
-    int size;
     bool isAnalaized;
-    bool newFrame;
+    
+protected:
+    void threadedFunction();
     
 public:
     iroAnalysis();
     ~iroAnalysis();
     
-    void setScale(int num) { scale = num; }
-    void setSize(int s) { size = s; }
-    void analize(ofPixels & pixels);
-    void update();
+    void setup(int scale) { this->scale = scale; }
+    void update(ofPixels & pixels);
     void draw(float x, float y);
-    
-    bool isFrameNew() { return newFrame; }
+    bool isFrameNew() { return isAnalaized; }
     vector<ofColor>getColor() { return analizedColor; }
 };
